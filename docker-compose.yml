@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: facturadora_db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-facturadora}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/complete_schema.sql:/docker-entrypoint-initdb.d/complete_schema.sql
+    networks:
+      - facturadora_network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: facturadora_backend
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${BACKEND_PORT:-3001}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-facturadora}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-password}
+      # Configuración del SRI
+      SRI_ENVIRONMENT: ${SRI_ENVIRONMENT:-test}
+      COMPANY_NAME: ${COMPANY_NAME:-EMPRESA DEMO}
+      COMPANY_RUC: ${COMPANY_RUC:-1234567890001}
+      COMPANY_ESTAB: ${COMPANY_ESTAB:-001}
+      COMPANY_PTOEMI: ${COMPANY_PTOEMI:-001}
+      COMPANY_ADDRESS: ${COMPANY_ADDRESS:-DIRECCION DEMO}
+      # Configuración de email
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER:-demo@gmail.com}
+      EMAIL_PASS: ${EMAIL_PASS:-demo_password}
+
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - facturadora_network
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: facturadora_frontend
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3001/api}
+      REACT_APP_ENV: ${NODE_ENV:-development}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - facturadora_network
+
+volumes:
+  postgres_data:
+
+networks:
+  facturadora_network:
+    driver: bridge 
